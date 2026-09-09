@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>POPSA · AR Monitoring</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230E5C4A%22/><text x=%2250%22 y=%2266%22 font-size=%2054%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22 font-weight=%22800%22>P</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+/* ============ DESIGN TOKENS ============ */
+:root{
+  --ink:#0F1A24;
+  --surface:#ffffff;
+  --surface-2:#F4F6F7;
+  --surface-3:#EBEEF0;
+  --border:#E1E6E9;
+  --primary:#0E5C4A;
+  --primary-dark:#0A4536;
+  --primary-tint:#E4F0EC;
+  --accent:#D9812A;
+  --accent-tint:#FBEBD6;
+  --green:#1E9E5A;   --green-bg:#E7F6ED; --green-dk:#166E3F;
+  --yellow:#C4841B;  --yellow-bg:#FCF0DA; --yellow-dk:#8F5F10;
+  --red:#D14343;     --red-bg:#FBEAEA;   --red-dk:#9A2B2B;
+  --text:#141F29;
+  --text-muted:#5C6B76;
+  --text-faint:#8996A1;
+  --font-head:'Manrope',system-ui,sans-serif;
+  --font-body:'Inter',system-ui,sans-serif;
+  --radius-s:8px;
+  --radius-m:14px;
+  --radius-l:20px;
+  --shadow-1: 0 1px 2px rgba(15,26,36,.06);
+  --shadow-2: 0 8px 24px rgba(15,26,36,.10);
+  --nav-h:64px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:var(--font-body);
+  color:var(--text);
+  background:var(--surface-3);
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+h1,h2,h3,.num{font-family:var(--font-head);}
+.num, .tabular{font-variant-numeric:tabular-nums;}
+button, input, select{font-family:inherit;}
+a{color:inherit;text-decoration:none;}
+::selection{background:var(--primary-tint);}
+
+/* App shell: mobile-first, centers as a card on wide screens */
+#shell{
+  max-width:520px;
+  margin:0 auto;
+  min-height:100vh;
+  background:var(--surface-2);
+  position:relative;
+  display:flex;
+  flex-direction:column;
+}
+@media (min-width:640px){
+  body{padding:28px 0;}
+  #shell{
+    min-height:calc(100vh - 56px);
+    border-radius:28px;
+    box-shadow:var(--shadow-2);
+    overflow:hidden;
+    border:1px solid var(--border);
+  }
+}
+
+/* Top bar */
+.topbar{
+  position:sticky; top:0; z-index:20;
+  background:var(--primary);
+  color:#fff;
+  padding:16px 18px 14px;
+}
+.topbar .brand{display:flex; align-items:center; gap:10px;}
+.topbar .brand-mark{
+  width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.16);
+  display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-weight:800;
+}
+.topbar h1{margin:0;font-size:16px;font-weight:700;letter-spacing:.01em;}
+.topbar .sub{font-size:12px;color:rgba(255,255,255,.72);margin-top:1px;}
+.topbar-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.icon-btn{
+  width:36px;height:36px;border-radius:10px;border:none;background:rgba(255,255,255,.14);
+  color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.icon-btn:active{background:rgba(255,255,255,.26);}
+
+/* Main content */
+#view{
+  flex:1;
+  padding:16px 16px calc(var(--nav-h) + 28px);
+}
+.page-title{font-size:20px;font-weight:800;margin:2px 0 4px;}
+.page-sub{font-size:13px;color:var(--text-muted);margin:0 0 16px;}
+
+/* Bottom nav */
+.bottomnav{
+  position:sticky;
+  bottom:0; left:0; right:0;
+  z-index:30;
+  height:var(--nav-h);
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  display:flex;
+  padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+}
+.bottomnav a{
+  flex:1;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  color:var(--text-faint);
+  font-size:11px; font-weight:600;
+  border-radius:12px;
+  padding:4px 2px;
+}
+.bottomnav a svg{width:21px;height:21px;}
+.bottomnav a.active{color:var(--primary);background:var(--primary-tint);}
+
+/* Cards */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-m);
+  padding:16px;
+  box-shadow:var(--shadow-1);
+}
+.card + .card{margin-top:10px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.stat-card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m);
+  padding:14px 14px 15px;
+}
+.stat-card .label{font-size:11.5px; color:var(--text-muted); font-weight:600; display:flex; align-items:center; gap:6px;}
+.stat-card .value{font-size:19px; font-weight:800; margin-top:6px; letter-spacing:-.01em;}
+.stat-card.accent{background:var(--primary); color:#fff; border:none;}
+.stat-card.accent .label{color:rgba(255,255,255,.75);}
+
+/* Badges */
+.badge{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700; padding:4px 9px; border-radius:100px;}
+.badge.dot::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;}
+.badge-green{background:var(--green-bg); color:var(--green-dk);}
+.badge-yellow{background:var(--yellow-bg); color:var(--yellow-dk);}
+.badge-red{background:var(--red-bg); color:var(--red-dk);}
+.badge-grey{background:var(--surface-3); color:var(--text-muted);}
+
+/* Buttons */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  border:none; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer;
+  padding:12px 18px; width:100%;
+}
+.btn-primary{background:var(--primary); color:#fff;}
+.btn-primary:active{background:var(--primary-dark);}
+.btn-accent{background:var(--accent); color:#fff;}
+.btn-outline{background:var(--surface); color:var(--text); border:1px solid var(--border);}
+.btn-ghost{background:transparent; color:var(--primary); width:auto; padding:8px 4px;}
+.btn-sm{padding:8px 12px; font-size:13px; width:auto;}
+.btn:disabled{opacity:.5; cursor:not-allowed;}
+
+/* Forms */
+.field{margin-bottom:14px;}
+.field label{display:block; font-size:12.5px; font-weight:600; color:var(--text-muted); margin-bottom:6px;}
+.input, select.input{
+  width:100%; padding:12px 13px; border-radius:11px; border:1px solid var(--border);
+  background:var(--surface); font-size:14.5px; color:var(--text);
+}
+.input:focus, select.input:focus{outline:2px solid var(--primary); outline-offset:0; border-color:var(--primary);}
+.search-wrap{position:relative;}
+.search-wrap svg{position:absolute; left:13px; top:50%; transform:translateY(-50%); color:var(--text-faint);}
+.search-wrap .input{padding-left:38px;}
+
+/* Filter chips */
+.chiprow{display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; -ms-overflow-style:none; scrollbar-width:none;}
+.chiprow::-webkit-scrollbar{display:none;}
+.chip{
+  flex:none; padding:8px 13px; border-radius:100px; border:1px solid var(--border); background:var(--surface);
+  font-size:12.5px; font-weight:600; color:var(--text-muted); cursor:pointer; white-space:nowrap;
+}
+.chip.active{background:var(--ink); border-color:var(--ink); color:#fff;}
+
+/* Outlet card (monitoring list) */
+.outlet-card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m);
+  padding:14px 15px; display:block; margin-bottom:10px; position:relative; border-left:4px solid var(--border);
+}
+.outlet-card.st-GREEN{border-left-color:var(--green);}
+.outlet-card.st-YELLOW{border-left-color:var(--yellow);}
+.outlet-card.st-RED{border-left-color:var(--red);}
+.outlet-card .top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+.outlet-card .name{font-weight:700; font-size:14.5px; line-height:1.3;}
+.outlet-card .code{font-size:12px; color:var(--text-faint); margin-top:1px;}
+.outlet-card .metrics{display:flex; gap:18px; margin-top:11px;}
+.outlet-card .metrics .m-label{font-size:10.5px; color:var(--text-faint); font-weight:600;}
+.outlet-card .metrics .m-value{font-size:14px; font-weight:700; margin-top:2px;}
+.outlet-card .go{position:absolute; right:14px; bottom:14px; font-size:11.5px; font-weight:700; color:var(--primary);}
+
+/* Invoice card */
+.inv-card{border-radius:var(--radius-m); padding:13px 14px; margin-bottom:9px; border:1px solid var(--border);}
+.inv-card.rg-30{background:var(--green-bg); border-color:#c9e9d5;}
+.inv-card.rg-60{background:var(--yellow-bg); border-color:#f2ddb2;}
+.inv-card.rg-90{background:#FEF0E4; border-color:#f6d2ac;}
+.inv-card.rg-90p{background:var(--red-bg); border-color:#f2c5c5;}
+.inv-card .head{display:flex; justify-content:space-between; font-weight:700; font-size:13.5px;}
+.inv-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; margin-top:9px;}
+.inv-grid div .k{font-size:10.5px; color:var(--text-muted); font-weight:600;}
+.inv-grid div .v{font-size:13px; font-weight:700; margin-top:1px;}
+
+/* Section header */
+.section-head{display:flex; align-items:center; justify-content:space-between; margin:20px 0 10px;}
+.section-head h2{font-size:14.5px; font-weight:800; margin:0;}
+.section-head .see-all{font-size:12px; font-weight:700; color:var(--primary);}
+
+/* Table (desktop-ish, used sparingly) */
+table.simple{width:100%; border-collapse:collapse; font-size:13px;}
+table.simple th{text-align:left; font-size:11px; color:var(--text-muted); font-weight:700; padding:8px 6px; border-bottom:1px solid var(--border);}
+table.simple td{padding:9px 6px; border-bottom:1px solid var(--border);}
+
+/* Empty / loading states */
+.empty-state{text-align:center; padding:44px 18px; color:var(--text-muted);}
+.empty-state svg{margin-bottom:10px; color:var(--text-faint);}
+.empty-state .t{font-weight:700; color:var(--text); font-size:14.5px; margin-bottom:4px;}
+.spinner{width:22px;height:22px;border-radius:50%;border:3px solid var(--surface-3);border-top-color:var(--primary);animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-wrap{display:flex; align-items:center; justify-content:center; gap:10px; padding:50px 0; color:var(--text-muted); font-size:13px;}
+.skel{background:linear-gradient(90deg,var(--surface-3) 25%,#F7F8F9 37%,var(--surface-3) 63%); background-size:400% 100%; animation:sk 1.3s ease infinite; border-radius:10px;}
+@keyframes sk{0%{background-position:100% 0}100%{background-position:0 0}}
+
+/* Modal / bottom sheet */
+.sheet-backdrop{position:fixed; inset:0; background:rgba(15,26,36,.45); z-index:50; display:flex; align-items:flex-end; justify-content:center;}
+.sheet{
+  background:var(--surface); width:100%; max-width:520px; border-radius:20px 20px 0 0;
+  padding:18px 18px calc(20px + env(safe-area-inset-bottom)); max-height:82vh; overflow:auto;
+}
+.sheet .handle{width:36px;height:4px;border-radius:3px;background:var(--border); margin:0 auto 14px;}
+.sheet h3{margin:0 0 14px; font-size:16px;}
+
+/* Toast */
+#toast{position:fixed; left:50%; bottom:calc(var(--nav-h) + 16px); transform:translateX(-50%); z-index:80; display:flex; flex-direction:column; gap:8px; align-items:center; width:100%; max-width:480px; padding:0 16px; pointer-events:none;}
+.toast-item{background:var(--ink); color:#fff; font-size:13px; font-weight:600; padding:11px 16px; border-radius:11px; box-shadow:var(--shadow-2); max-width:100%;}
+.toast-item.err{background:var(--red-dk);}
+.toast-item.ok{background:var(--green-dk);}
+
+/* Login screen */
+.login-wrap{min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding:32px 26px;}
+.login-logo{width:56px;height:56px;border-radius:16px;background:var(--primary); color:#fff; display:flex;align-items:center;justify-content:center;font-family:var(--font-head); font-weight:800; font-size:22px; margin-bottom:20px;}
+.login-wrap h1{font-size:23px; margin:0 0 6px;}
+.login-wrap p.hint{color:var(--text-muted); font-size:13.5px; margin:0 0 26px;}
+.error-box{background:var(--red-bg); color:var(--red-dk); font-size:13px; font-weight:600; padding:11px 13px; border-radius:11px; margin-bottom:14px;}
+
+/* Misc */
+.hr{height:1px; background:var(--border); margin:16px 0;}
+.muted{color:var(--text-muted);}
+.small{font-size:12px;}
+.mt{margin-top:14px;}
+.flex-between{display:flex; align-items:center; justify-content:space-between;}
+.progress-bar{height:8px; border-radius:6px; background:var(--surface-3); overflow:hidden; display:flex;}
+.upload-drop{border:1.5px dashed var(--border); border-radius:var(--radius-m); padding:26px 16px; text-align:center; cursor:pointer;}
+.upload-drop:active{background:var(--surface-2);}
+.kv-row{display:flex; justify-content:space-between; padding:8px 0; font-size:13.5px; border-bottom:1px dashed var(--border);}
+.kv-row .k{color:var(--text-muted);}
+.kv-row .v{font-weight:700;}
+.pill-radio{display:flex; gap:8px; flex-wrap:wrap;}
+.pill-radio label{border:1px solid var(--border); border-radius:100px; padding:8px 14px; font-size:12.5px; font-weight:600; cursor:pointer;}
+.pill-radio input{display:none;}
+.pill-radio input:checked + span{color:#fff;}
+.pill-radio label:has(input:checked){background:var(--ink); border-color:var(--ink); color:#fff;}
+</style>
+</head>
+<body>
+<div id="shell">
+  <div id="view"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+/* =========================================================
+   POPSA AR MONITORING SYSTEM — Front-end App
+   Backend: Supabase (Postgres + Auth)
+   ========================================================= */
+
+const SUPABASE_URL = "https://plzgidlxbqrpudmraegi.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_8C-hSNKyc6jaKwI1fYBVkw_Jf6UzupC";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const APP = {
+  user: null,
+  profile: null,
+  outletCache: null,      // array from v_outlet_summary
+  outletCacheAt: 0,
+  latestImport: null,
+  importsHistory: null,
+};
+
+/* ---------------- utils ---------------- */
+function rp(n){
+  n = Number(n||0);
+  return "Rp " + Math.round(n).toLocaleString("id-ID");
+}
+function rpShort(n){
+  n = Number(n||0);
+  if(Math.abs(n) >= 1e9) return "Rp " + (n/1e9).toFixed(2).replace(/\.00$/,'') + " M";
+  if(Math.abs(n) >= 1e6) return "Rp " + (n/1e6).toFixed(1).replace(/\.0$/,'') + " Jt";
+  return rp(n);
+}
+function fmtDate(d){
+  if(!d) return "-";
+  const dt = (d instanceof Date) ? d : new Date(d);
+  if(isNaN(dt)) return "-";
+  return dt.toLocaleDateString("id-ID",{day:"2-digit",month:"long",year:"numeric"});
+}
+function excelSerialToDate(v){
+  if(v instanceof Date) return v;
+  if(typeof v === "number") return new Date(Date.UTC(1899,11,30) + Math.round(v)*86400000);
+  if(typeof v === "string" && v.trim()){
+    const d = new Date(v);
+    if(!isNaN(d)) return d;
+  }
+  return null;
+}
+function toISO(d){
+  if(!d) return null;
+  const dt = (d instanceof Date) ? d : new Date(d);
+  if(isNaN(dt)) return null;
+  return dt.toISOString().slice(0,10);
+}
+function esc(s){
+  return String(s==null?"":s).replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+function statusBadge(status){
+  const map = {
+    GREEN:["badge-green","Aman"], YELLOW:["badge-yellow","Perhatian"],
+    RED:["badge-red","Risiko Tinggi"], NODATA:["badge-grey","Belum Ada AR"]
+  };
+  const [cls,label] = map[status] || map.NODATA;
+  return `<span class="badge dot ${cls}">${label}</span>`;
+}
+function rangeClass(range){
+  if(range==="AR 1-30 Hari") return "rg-30";
+  if(range==="AR 31-60 Hari") return "rg-60";
+  if(range==="AR 61-90 Hari") return "rg-90";
+  return "rg-90p";
+}
+function rangeEmoji(range){
+  if(range==="AR 1-30 Hari") return "🟢";
+  if(range==="AR 31-60 Hari") return "🟡";
+  if(range==="AR 61-90 Hari") return "🟠";
+  return "🔴";
+}
+function toast(msg, type){
+  const box = document.getElementById("toast");
+  const item = document.createElement("div");
+  item.className = "toast-item" + (type ? " "+type : "");
+  item.textContent = msg;
+  box.appendChild(item);
+  setTimeout(()=>{ item.style.transition="opacity .3s"; item.style.opacity="0"; setTimeout(()=>item.remove(),300); }, 2600);
+}
+function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+function qs(sel, root){ return (root||document).querySelector(sel); }
+function qsa(sel, root){ return Array.from((root||document).querySelectorAll(sel)); }
+
+/* ---------------- icons (inline svg, stroke-based, no library) ---------------- */
+const ICONS = {
+  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
+  bars:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V10M12 19V4M20 19v-7"/></svg>',
+  upload:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>',
+  user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4.5 5-6 8-6s6.5 1.5 8 6"/></svg>',
+  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+  filter:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>',
+  logout:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>',
+  box:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
+  chevron:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>',
+  inbox:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12h4l2 3h4l2-3h4"/><path d="M5 4h14l3 8v6a2 2 0 01-2 2H4a2 2 0 01-2-2v-6l3-8z"/></svg>',
+  refresh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0114.5-4.5L23 9M1 15l5.5 4.5A9 9 0 0020.5 15"/></svg>',
+};
+
+/* ---------------- API layer ---------------- */
+async function loadProfile(){
+  const { data: sess } = await sb.auth.getSession();
+  APP.user = sess?.session?.user || null;
+  if(!APP.user){ APP.profile = null; return; }
+  const { data, error } = await sb.from("profiles").select("*").eq("id", APP.user.id).single();
+  APP.profile = error ? null : data;
+}
+
+async function fetchOutletSummary(force){
+  if(APP.outletCache && !force && (Date.now() - APP.outletCacheAt < 60000)) return APP.outletCache;
+  const { data, error } = await sb.from("v_outlet_summary").select("*").order("outlet_name",{ascending:true});
+  if(error){ toast("Gagal memuat data outlet: "+error.message, "err"); return []; }
+  APP.outletCache = data || [];
+  APP.outletCacheAt = Date.now();
+  return APP.outletCache;
+}
+
+async function fetchLatestImport(){
+  const { data, error } = await sb.from("v_latest_import").select("*").maybeSingle();
+  APP.latestImport = error ? null : data;
+  return APP.latestImport;
+}
+
+/* ---------------- router ---------------- */
+const ROUTES = {
+  "#/login": {view: viewLogin, auth:false},
+  "#/dashboard": {view: viewDashboard, auth:true},
+  "#/monitoring": {view: viewMonitoring, auth:true},
+  "#/summary": {view: viewSummary, auth:true},
+  "#/import": {view: viewImport, auth:true, admin:true},
+  "#/master": {view: viewMaster, auth:true, admin:true},
+  "#/profile": {view: viewProfile, auth:true},
+};
+
+function currentHash(){
+  const h = location.hash || "#/dashboard";
+  return h.split("?")[0];
+}
+function hashParams(){
+  const q = location.hash.split("?")[1];
+  return new URLSearchParams(q||"");
+}
+
+async function router(){
+  await loadProfile();
+  let path = currentHash();
+  let base = path.split("/").slice(0,3).join("/"); // support #/outlet/CODE
+  let route = ROUTES[path] || (path.startsWith("#/outlet/") ? {view: viewOutletDetail, auth:true} : null);
+
+  if(!route){ location.hash = APP.user ? "#/dashboard" : "#/login"; return; }
+  if(route.auth && !APP.user){ location.hash = "#/login"; return; }
+  if(!route.auth && APP.user){ location.hash = "#/dashboard"; return; }
+  if(route.admin && APP.profile?.role !== "admin"){ location.hash = "#/dashboard"; toast("Halaman ini khusus Admin","err"); return; }
+
+  renderShellChrome(path);
+  const container = document.getElementById("view");
+  container.innerHTML = `<div class="loading-wrap"><div class="spinner"></div> Memuat…</div>`;
+  try{
+    await route.view(container, path);
+  }catch(err){
+    console.error(err);
+    container.innerHTML = `<div class="empty-state"><div class="t">Terjadi kesalahan</div><div class="small">${esc(err.message||err)}</div></div>`;
+  }
+}
+window.addEventListener("hashchange", router);
+window.addEventListener("DOMContentLoaded", async ()=>{
+  sb.auth.onAuthStateChange((event)=>{ if(event==="SIGNED_IN"||event==="SIGNED_OUT") router(); });
+  await router();
+});
+
+function renderShellChrome(path){
+  const shell = document.getElementById("shell");
+  const isLogin = path === "#/login";
+  qs("#topbar-mount")?.remove();
+  qs("#bottomnav-mount")?.remove();
+  if(isLogin) return;
+
+  const topbar = document.createElement("div");
+  topbar.id = "topbar-mount";
+  topbar.innerHTML = topbarHTML(path);
+  shell.insertBefore(topbar.firstElementChild, shell.firstChild);
+
+  const nav = document.createElement("div");
+  nav.id = "bottomnav-mount";
+  nav.innerHTML = bottomNavHTML(path);
+  shell.appendChild(nav.firstElementChild);
+}
+
+function topbarHTML(path){
+  const titles = {
+    "#/dashboard":["POPSA AR Monitoring", APP.latestImport ? "Update: "+fmtDate(APP.latestImport.data_date) : ""],
+    "#/monitoring":["Monitoring Outlet",""],
+    "#/summary":["Summary","Ringkasan kondisi AR"],
+    "#/import":["Import Data AR","Upload & kelola data piutang"],
+    "#/master":["Master Outlet","Database outlet (Sheet BB 2026)"],
+    "#/profile":["Profile","Pengaturan akun"],
+  };
+  let [title, sub] = titles[path] || ["POPSA", ""];
+  if(path.startsWith("#/outlet/")){ title = "Detail Outlet"; sub = ""; }
+  const showBack = path.startsWith("#/outlet/");
+  return `<div class="topbar">
+    <div class="topbar-row">
+      <div class="brand">
+        ${showBack ? `<button class="icon-btn" onclick="history.back()">${ICONS.back}</button>` : `<div class="brand-mark">P</div>`}
+        <div>
+          <h1>${esc(title)}</h1>
+          ${sub ? `<div class="sub">${esc(sub)}</div>` : ""}
+        </div>
+      </div>
+      <button class="icon-btn" title="Muat ulang" onclick="hardRefresh()">${ICONS.refresh}</button>
+    </div>
+  </div>`;
+}
+window.hardRefresh = async function(){
+  APP.outletCache = null;
+  toast("Memuat ulang data…");
+  await router();
+};
+
+function bottomNavHTML(path){
+  const isAdmin = APP.profile?.role === "admin";
+  const items = [
+    ["#/dashboard","home","Dashboard"],
+    ["#/monitoring","search","Monitoring"],
+    ["#/summary","bars","Summary"],
+  ];
+  if(isAdmin) items.push(["#/import","upload","Import"]);
+  items.push(["#/profile","user","Profile"]);
+  const active = (h)=> (path===h || (h==="#/monitoring" && path.startsWith("#/outlet/"))) ? "active" : "";
+  return `<div class="bottomnav">
+    ${items.map(([h,icon,label])=>`<a href="${h}" class="${active(h)}">${ICONS[icon]}<span>${label}</span></a>`).join("")}
+  </div>`;
+}
+
+/* =========================================================
+   VIEW: LOGIN
+   ========================================================= */
+function viewLogin(container){
+  container.innerHTML = `
+  <div class="login-wrap">
+    <div class="login-logo">P</div>
+    <h1>POPSA AR Monitoring</h1>
+    <p class="hint">Masuk untuk memantau piutang outlet secara realtime dari HP maupun komputer.</p>
+    <div id="login-error"></div>
+    <form id="login-form">
+      <div class="field">
+        <label>Email</label>
+        <input class="input" type="email" id="li-email" placeholder="nama@perusahaan.com" required autocomplete="username">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input class="input" type="password" id="li-pass" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" type="submit" id="li-submit">Masuk</button>
+    </form>
+    <p class="small muted mt" style="text-align:center;">Belum punya akun? Hubungi Admin untuk dibuatkan akses.</p>
+  </div>`;
+  qs("#login-form").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const btn = qs("#li-submit");
+    btn.disabled = true; btn.textContent = "Memproses…";
+    const email = qs("#li-email").value.trim();
+    const password = qs("#li-pass").value;
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if(error){
+      qs("#login-error").innerHTML = `<div class="error-box">${esc(error.message)}</div>`;
+      btn.disabled = false; btn.textContent = "Masuk";
+      return;
+    }
+    location.hash = "#/dashboard";
+  });
+}
+
+/* =========================================================
+   VIEW: DASHBOARD
+   ========================================================= */
+async function viewDashboard(container){
+  await fetchLatestImport();
+  const rows = await fetchOutletSummary();
+
+  let totalAR=0, over30=0, ar30=0, ar60=0, ar90=0, ar90p=0;
+  let cGreen=0, cYellow=0, cRed=0, cProblem=0;
+  for(const r of rows){
+    totalAR += Number(r.total_ar||0);
+    over30 += Number(r.ar_over_30||0);
+    ar30 += Number(r.ar_1_30||0);
+    ar60 += Number(r.ar_31_60||0);
+    ar90 += Number(r.ar_61_90||0);
+    ar90p += Number(r.ar_90_plus||0);
+    if(r.status_ar==="GREEN") cGreen++;
+    else if(r.status_ar==="YELLOW") cYellow++;
+    else if(r.status_ar==="RED"){ cRed++; cProblem++; }
+  }
+
+  container.innerHTML = `
+  <div class="grid-2">
+    <div class="stat-card accent">
+      <div class="label">${ICONS.box.replace('width="24" height="24"','width="14" height="14"')} Total Sisa AR</div>
+      <div class="value num">${rpShort(totalAR)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">AR &gt; 30 Hari</div>
+      <div class="value num" style="color:var(--red-dk)">${rpShort(over30)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Outlet Bermasalah</div>
+      <div class="value num">${cProblem}<span style="font-size:12px;font-weight:600;color:var(--text-faint)"> outlet</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Update Data Terakhir</div>
+      <div class="value" style="font-size:14px;">${APP.latestImport ? fmtDate(APP.latestImport.data_date) : "Belum ada data"}</div>
+    </div>
+  </div>
+
+  <div class="section-head"><h2>Status Outlet</h2></div>
+  <div class="card">
+    <div style="display:flex; gap:10px;">
+      <a href="#/monitoring?status=GREEN" style="flex:1; text-align:center; padding:10px 4px; border-radius:12px; background:var(--green-bg);">
+        <div style="font-size:18px; font-weight:800; color:var(--green-dk);">${cGreen}</div>
+        <div class="small" style="color:var(--green-dk); font-weight:700;">🟢 Green</div>
+      </a>
+      <a href="#/monitoring?status=YELLOW" style="flex:1; text-align:center; padding:10px 4px; border-radius:12px; background:var(--yellow-bg);">
+        <div style="font-size:18px; font-weight:800; color:var(--yellow-dk);">${cYellow}</div>
+        <div class="small" style="color:var(--yellow-dk); font-weight:700;">🟡 Yellow</div>
+      </a>
+      <a href="#/monitoring?status=RED" style="flex:1; text-align:center; padding:10px 4px; border-radius:12px; background:var(--red-bg);">
+        <div style="font-size:18px; font-weight:800; color:var(--red-dk);">${cRed}</div>
+        <div class="small" style="color:var(--red-dk); font-weight:700;">🔴 Red</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="section-head"><h2>Summary Aging AR</h2></div>
+  <div class="card" style="padding:6px 16px;">
+    ${agingRow("🟢","AR 1-30 Hari", ar30, totalAR)}
+    ${agingRow("🟡","AR 31-60 Hari", ar60, totalAR)}
+    ${agingRow("🟠","AR 61-90 Hari", ar90, totalAR)}
+    ${agingRow("🔴","AR >90 Hari", ar90p, totalAR)}
+  </div>
+
+  <div class="section-head"><h2>Cari Outlet</h2></div>
+  <div class="card">
+    <div class="search-wrap">
+      ${ICONS.search}
+      <input class="input" placeholder="Cari nama outlet atau kode outlet…" onfocus="location.hash='#/monitoring'" readonly>
+    </div>
+  </div>
+  `;
+}
+function agingRow(icon,label,val,total){
+  const pct = total>0 ? Math.round((val/total)*100) : 0;
+  return `<div style="padding:12px 0; border-bottom:1px dashed var(--border);">
+    <div class="flex-between"><div style="font-weight:600; font-size:13.5px;">${icon} ${label}</div><div class="num" style="font-weight:700;">${rp(val)}</div></div>
+    <div class="progress-bar mt" style="margin-top:8px;"><div style="width:${pct}%; background:var(--primary);"></div></div>
+  </div>`;
+}
+
+/* =========================================================
+   VIEW: MONITORING OUTLET
+   ========================================================= */
+async function viewMonitoring(container){
+  const params = hashParams();
+  const rows = await fetchOutletSummary();
+
+  const state = {
+    q: "",
+    depo: "", region: "", dsr: "", sektor: "",
+    status: params.get("status") || "",
+    page: 1, pageSize: 15,
+  };
+
+  const uniq = (key)=> Array.from(new Set(rows.map(r=>r[key]).filter(Boolean))).sort();
+  const depos = uniq("depo"), regions = uniq("region"), dsrs = uniq("dsr"), sektors = uniq("sektor");
+
+  container.innerHTML = `
+    <div class="search-wrap">
+      ${ICONS.search}
+      <input class="input" id="mo-search" placeholder="Cari Nama Outlet atau Kode Outlet…" autofocus>
+    </div>
+    <div class="chiprow mt" id="mo-status-chips">
+      ${["","GREEN","YELLOW","RED"].map(s=>`<div class="chip ${state.status===s?'active':''}" data-status="${s}">${s===""?"Semua Status":(s==="GREEN"?"🟢 Green":s==="YELLOW"?"🟡 Yellow":"🔴 Red")}</div>`).join("")}
+      <div class="chip" id="mo-filter-btn">${ICONS.filter.replace('width="24" height="24"','width="13" height="13"')} Filter Lain</div>
+    </div>
+    <div class="flex-between mt" style="margin-top:14px;">
+      <div class="small muted" id="mo-count"></div>
+    </div>
+    <div id="mo-list" class="mt"></div>
+    <div id="mo-loadmore"></div>
+  `;
+
+  function applyAndRender(){
+    let filtered = rows.filter(r=>{
+      if(state.status && r.status_ar !== state.status) return false;
+      if(state.depo && r.depo !== state.depo) return false;
+      if(state.region && r.region !== state.region) return false;
+      if(state.dsr && r.dsr !== state.dsr) return false;
+      if(state.sektor && r.sektor !== state.sektor) return false;
+      if(state.q){
+        const q = state.q.toLowerCase();
+        if(!(String(r.outlet_name||"").toLowerCase().includes(q) || String(r.outlet_code||"").toLowerCase().includes(q))) return false;
+      }
+      return true;
+    });
+    qs("#mo-count").textContent = `${filtered.length} outlet ditemukan`;
+    const shown = filtered.slice(0, state.page*state.pageSize);
+    qs("#mo-list").innerHTML = shown.length ? shown.map(outletCardHTML).join("") : emptyStateHTML("Outlet tidak ditemukan","Coba ubah kata kunci pencarian atau filter.");
+    qs("#mo-loadmore").innerHTML = filtered.length > shown.length
+      ? `<button class="btn btn-outline" id="mo-more">Muat lebih banyak (${filtered.length - shown.length})</button>` : "";
+    qs("#mo-more")?.addEventListener("click", ()=>{ state.page++; applyAndRender(); });
+  }
+
+  qs("#mo-search").addEventListener("input", debounce((e)=>{ state.q = e.target.value; state.page=1; applyAndRender(); }, 180));
+  qs("#mo-status-chips").addEventListener("click", (e)=>{
+    const chip = e.target.closest(".chip[data-status]");
+    if(chip){ state.status = chip.dataset.status; state.page=1;
+      qsa(".chip[data-status]").forEach(c=>c.classList.toggle("active", c===chip));
+      applyAndRender();
+    }
+  });
+  qs("#mo-filter-btn").addEventListener("click", ()=>{
+    openSheet(`
+      <h3>Filter Outlet</h3>
+      ${filterSelect("Depo","f-depo",depos,state.depo)}
+      ${filterSelect("Region","f-region",regions,state.region)}
+      ${filterSelect("DSR","f-dsr",dsrs,state.dsr)}
+      ${filterSelect("Sektor / Channel","f-sektor",sektors,state.sektor)}
+      <div style="display:flex; gap:10px; margin-top:6px;">
+        <button class="btn btn-outline" id="f-reset">Reset</button>
+        <button class="btn btn-primary" id="f-apply">Terapkan</button>
+      </div>
+    `);
+    qs("#f-apply").addEventListener("click", ()=>{
+      state.depo = qs("#f-depo").value; state.region = qs("#f-region").value;
+      state.dsr = qs("#f-dsr").value; state.sektor = qs("#f-sektor").value;
+      state.page = 1; closeSheet(); applyAndRender();
+    });
+    qs("#f-reset").addEventListener("click", ()=>{
+      state.depo=state.region=state.dsr=state.sektor=""; state.page=1; closeSheet(); applyAndRender();
+    });
+  });
+
+  applyAndRender();
+}
+function filterSelect(label,id,options,value){
+  return `<div class="field"><label>${label}</label>
+    <select class="input" id="${id}"><option value="">Semua ${esc(label)}</option>
+    ${options.map(o=>`<option value="${esc(o)}" ${o===value?"selected":""}>${esc(o)}</option>`).join("")}
+    </select></div>`;
+}
+function outletCardHTML(r){
+  return `<a href="#/outlet/${encodeURIComponent(r.outlet_code)}" class="outlet-card st-${r.status_ar}">
+    <div class="top">
+      <div>
+        <div class="name">${esc(r.outlet_name)}</div>
+        <div class="code">${esc(r.outlet_code)} · ${esc(r.depo||"-")}</div>
+      </div>
+      ${statusBadge(r.status_ar)}
+    </div>
+    <div class="metrics">
+      <div><div class="m-label">Total AR</div><div class="m-value num">${rpShort(r.total_ar)}</div></div>
+      <div><div class="m-label">AR &gt;30 Hari</div><div class="m-value num">${rpShort(r.ar_over_30)}</div></div>
+    </div>
+    <div class="go">Lihat Detail →</div>
+  </a>`;
+}
+function emptyStateHTML(title,sub){
+  return `<div class="empty-state">${ICONS.inbox.replace('width="24" height="24"','width="40" height="40"')}<div class="t">${esc(title)}</div><div class="small">${esc(sub)}</div></div>`;
+}
+
+/* =========================================================
+   VIEW: OUTLET DETAIL
+   ========================================================= */
+async function viewOutletDetail(container, path){
+  const code = decodeURIComponent(path.split("/")[2]||"");
+  const rows = await fetchOutletSummary();
+  const o = rows.find(r=>r.outlet_code === code);
+  if(!o){ container.innerHTML = emptyStateHTML("Outlet tidak ditemukan","Kode outlet tidak valid."); return; }
+
+  const { data: invoices, error } = await sb.from("v_ar_current").select("*").eq("outlet_id", o.outlet_id).order("usia_ar",{ascending:false});
+  if(error) toast("Gagal memuat invoice: "+error.message, "err");
+
+  container.innerHTML = `
+  <div class="card">
+    <div class="flex-between">
+      <div>
+        <div style="font-weight:800; font-size:17px;">${esc(o.outlet_name)}</div>
+        <div class="small muted" style="margin-top:2px;">${esc(o.outlet_code)}</div>
+      </div>
+      ${statusBadge(o.status_ar)}
+    </div>
+    <div class="hr"></div>
+    <div class="kv-row"><div class="k">Channel / Sektor</div><div class="v">${esc(o.sektor||"-")}</div></div>
+    <div class="kv-row"><div class="k">Depo</div><div class="v">${esc(o.depo||"-")}</div></div>
+    <div class="kv-row"><div class="k">Region</div><div class="v">${esc(o.region||"-")}</div></div>
+    <div class="kv-row"><div class="k">DSR</div><div class="v">${esc(o.dsr||"-")}</div></div>
+    <div class="kv-row" style="border-bottom:none;"><div class="k">Credit Limit</div><div class="v num">${rp(o.credit_limit)}</div></div>
+  </div>
+
+  <div class="section-head"><h2>Summary AR Outlet</h2></div>
+  <div class="card accent" style="background:var(--primary); color:#fff; border:none;">
+    <div class="small" style="color:rgba(255,255,255,.75); font-weight:600;">Total Sisa AR</div>
+    <div class="num" style="font-size:24px; font-weight:800; margin-top:2px;">${rp(o.total_ar)}</div>
+  </div>
+  <div class="card">
+    ${agingKV("🟢 AR 1-30 Hari", o.ar_1_30)}
+    ${agingKV("🟡 AR 31-60 Hari", o.ar_31_60)}
+    ${agingKV("🟠 AR 61-90 Hari", o.ar_61_90)}
+    ${agingKV("🔴 AR >90 Hari", o.ar_90_plus)}
+  </div>
+
+  <button class="btn btn-outline mt" id="share-wa">📲 Share via WhatsApp</button>
+
+  <div class="section-head"><h2>Detail Invoice (${invoices?.length||0})</h2></div>
+  <div id="inv-list">
+    ${(invoices&&invoices.length) ? invoices.map(invCardHTML).join("") : emptyStateHTML("Tidak ada invoice outstanding","Outlet ini tidak memiliki sisa piutang berjalan.")}
+  </div>
+  `;
+
+  qs("#share-wa")?.addEventListener("click", ()=>{
+    const msg = `Monitoring AR Outlet\n\n${o.outlet_name}\nKode: ${o.outlet_code}\n\nTotal AR:\n${rp(o.total_ar)}\n\nAR >30 Hari:\n${rp(o.ar_over_30)}\n\nStatus:\n${o.status_ar}\n\nUpdate:\n${APP.latestImport?fmtDate(APP.latestImport.data_date):"-"}`;
+    window.open("https://wa.me/?text="+encodeURIComponent(msg), "_blank");
+  });
+}
+function agingKV(label,val){
+  return `<div class="kv-row"><div class="k">${label}</div><div class="v num">${rp(val)}</div></div>`;
+}
+function invCardHTML(inv){
+  return `<div class="inv-card ${rangeClass(inv.range_ar)}">
+    <div class="head"><span>${rangeEmoji(inv.range_ar)} ${esc(inv.invoice_number)}</span><span>${inv.usia_ar} Hari</span></div>
+    <div class="inv-grid">
+      <div><div class="k">📅 Tanggal Invoice</div><div class="v">${fmtDate(inv.invoice_date)}</div></div>
+      <div><div class="k">🏷 Range</div><div class="v">${esc(inv.range_ar)}</div></div>
+      <div><div class="k">💰 Nilai Invoice</div><div class="v num">${rp(inv.invoice_amount)}</div></div>
+      <div><div class="k">💰 Sisa Invoice</div><div class="v num">${rp(inv.outstanding_amount)}</div></div>
+    </div>
+  </div>`;
+}
+
+/* =========================================================
+   VIEW: SUMMARY
+   ========================================================= */
+async function viewSummary(container){
+  const rows = await fetchOutletSummary();
+  const uniq = (key)=> Array.from(new Set(rows.map(r=>r[key]).filter(Boolean))).sort();
+  const state = { depo:"", region:"", dsr:"", sektor:"" };
+
+  function compute(){
+    const f = rows.filter(r=>
+      (!state.depo || r.depo===state.depo) &&
+      (!state.region || r.region===state.region) &&
+      (!state.dsr || r.dsr===state.dsr) &&
+      (!state.sektor || r.sektor===state.sektor)
+    );
+    let totalAR=0, over30=0, g=0,y=0,rC=0, withAR=0;
+    for(const r of f){
+      totalAR+=Number(r.total_ar||0); over30+=Number(r.ar_over_30||0);
+      if(r.status_ar==="GREEN") g++; else if(r.status_ar==="YELLOW") y++; else if(r.status_ar==="RED") rC++;
+      if(Number(r.total_ar||0)>0) withAR++;
+    }
+    return {f,totalAR,over30,g,y,rC,withAR};
+  }
+
+  function render(){
+    const {f,totalAR,over30,g,y,rC,withAR} = compute();
+    const top10AR = [...f].sort((a,b)=>b.total_ar-a.total_ar).slice(0,10);
+    const top10Over90 = [...f].filter(r=>r.ar_90_plus>0).sort((a,b)=>b.ar_90_plus-a.ar_90_plus).slice(0,10);
+
+    qs("#sm-body").innerHTML = `
+      <div class="grid-2">
+        <div class="stat-card"><div class="label">Total Outlet Ber-AR</div><div class="value">${withAR}</div></div>
+        <div class="stat-card"><div class="label">Total Sisa AR</div><div class="value num">${rpShort(totalAR)}</div></div>
+        <div class="stat-card"><div class="label">Total AR &gt;30 Hari</div><div class="value num">${rpShort(over30)}</div></div>
+        <div class="stat-card"><div class="label">Outlet RED</div><div class="value" style="color:var(--red-dk)">${rC}</div></div>
+      </div>
+      <div class="card mt">
+        <div style="display:flex; gap:10px;">
+          <div style="flex:1; text-align:center;"><div class="num" style="font-weight:800; font-size:16px; color:var(--green-dk)">${g}</div><div class="small muted">🟢 Green</div></div>
+          <div style="flex:1; text-align:center;"><div class="num" style="font-weight:800; font-size:16px; color:var(--yellow-dk)">${y}</div><div class="small muted">🟡 Yellow</div></div>
+          <div style="flex:1; text-align:center;"><div class="num" style="font-weight:800; font-size:16px; color:var(--red-dk)">${rC}</div><div class="small muted">🔴 Red</div></div>
+        </div>
+      </div>
+
+      <div class="section-head"><h2>Top 10 Sisa AR Terbesar</h2></div>
+      <div class="card" style="padding:4px 16px;">
+        ${top10AR.length ? top10AR.map((r,i)=>rankRow(i+1,r,'total_ar')).join("") : `<div class="muted small" style="padding:14px 0;">Tidak ada data</div>`}
+      </div>
+
+      <div class="section-head"><h2>Top 10 AR &gt;90 Hari</h2></div>
+      <div class="card" style="padding:4px 16px;">
+        ${top10Over90.length ? top10Over90.map((r,i)=>rankRow(i+1,r,'ar_90_plus')).join("") : `<div class="muted small" style="padding:14px 0;">Tidak ada outlet dengan AR &gt;90 hari 🎉</div>`}
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    <div class="chiprow">
+      <div class="chip" id="sm-filter-btn">${ICONS.filter.replace('width="24" height="24"','width="13" height="13"')} Filter (Depo / Region / DSR / Sektor)</div>
+    </div>
+    <div id="sm-body" class="mt"></div>
+  `;
+  qs("#sm-filter-btn").addEventListener("click", ()=>{
+    openSheet(`
+      <h3>Filter Summary</h3>
+      ${filterSelect("Depo","s-depo",uniq("depo"),state.depo)}
+      ${filterSelect("Region","s-region",uniq("region"),state.region)}
+      ${filterSelect("DSR","s-dsr",uniq("dsr"),state.dsr)}
+      ${filterSelect("Sektor","s-sektor",uniq("sektor"),state.sektor)}
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-outline" id="s-reset">Reset</button>
+        <button class="btn btn-primary" id="s-apply">Terapkan</button>
+      </div>
+    `);
+    qs("#s-apply").addEventListener("click", ()=>{
+      state.depo=qs("#s-depo").value; state.region=qs("#s-region").value;
+      state.dsr=qs("#s-dsr").value; state.sektor=qs("#s-sektor").value;
+      closeSheet(); render();
+    });
+    qs("#s-reset").addEventListener("click", ()=>{ state.depo=state.region=state.dsr=state.sektor=""; closeSheet(); render(); });
+  });
+  render();
+}
+function rankRow(rank,r,field){
+  return `<a href="#/outlet/${encodeURIComponent(r.outlet_code)}" style="display:flex; align-items:center; gap:11px; padding:11px 0; border-bottom:1px dashed var(--border);">
+    <div style="width:22px; height:22px; border-radius:6px; background:var(--surface-3); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; flex:none;">${rank}</div>
+    <div style="flex:1; min-width:0;">
+      <div style="font-weight:700; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(r.outlet_name)}</div>
+      <div class="small muted">${esc(r.outlet_code)}</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="num" style="font-weight:800; font-size:13px;">${rpShort(r[field])}</div>
+      ${statusBadge(r.status_ar)}
+    </div>
+  </a>`;
+}
+
+/* =========================================================
+   VIEW: IMPORT AR (admin)
+   ========================================================= */
+async function viewImport(container){
+  const { data: history } = await sb.from("ar_imports").select("*").order("import_date",{ascending:false}).limit(8);
+  container.innerHTML = `
+  <div class="card">
+    <div style="font-weight:700; margin-bottom:10px;">Upload File Excel AR</div>
+    <div class="small muted" style="margin-bottom:14px;">
+      Format kolom minimal: No Faktur, Tgl Faktur, Tgl Jatuh Tempo, No Cust, Nama Customer, Nilai Faktur,
+      Sisa Piutang Saat Input, Salesman, Area, ID Cust BB, Nama Cust BB.
+    </div>
+    <label class="upload-drop" id="ar-drop">
+      ${ICONS.upload.replace('width="24" height="24"','width="26" height="26"')}
+      <div style="font-weight:700; margin-top:8px;">Klik untuk pilih file .xlsx</div>
+      <div class="small muted mt">atau tarik file ke sini</div>
+      <input type="file" id="ar-file" accept=".xlsx,.xls" style="display:none;">
+    </label>
+    <div class="field mt" style="margin-top:16px;">
+      <label>Tanggal Update Data (acuan perhitungan usia AR)</label>
+      <input class="input" type="date" id="ar-datadate" value="${new Date().toISOString().slice(0,10)}">
+    </div>
+  </div>
+
+  <div id="ar-preview"></div>
+
+  <div class="section-head"><h2>Riwayat Import</h2></div>
+  <div class="card" style="padding:4px 16px;">
+    ${(history&&history.length) ? history.map(h=>`
+      <div class="kv-row">
+        <div class="k">${esc(h.file_name)}<br><span style="font-size:11px;">${fmtDate(h.import_date)} · ${h.total_rows} baris</span></div>
+        <div class="v">${h.status==='completed'?statusBadge('GREEN').replace('Aman','Selesai'):statusBadge('YELLOW').replace('Perhatian',h.status)}</div>
+      </div>`).join("") : `<div class="muted small" style="padding:14px 0;">Belum ada riwayat import</div>`}
+  </div>
+  `;
+
+  let parsedRows = [];
+  let outletMap = null;
+
+  qs("#ar-drop").addEventListener("click",(e)=>{ if(e.target.tagName!=="INPUT") qs("#ar-file").click(); });
+  qs("#ar-file").addEventListener("change", async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    qs("#ar-preview").innerHTML = `<div class="loading-wrap"><div class="spinner"></div> Membaca & memvalidasi file…</div>`;
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:"array", cellDates:true});
+      const sheetName = wb.SheetNames.find(n=>/ar/i.test(n)) || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+
+      const headerIdx = raw.findIndex(row => row && row.some(c => String(c||"").trim().toLowerCase().includes("no. faktur") || String(c||"").trim().toLowerCase().includes("no faktur")));
+      if(headerIdx === -1) throw new Error("Header 'No Faktur' tidak ditemukan di sheet '"+sheetName+"'. Pastikan format sesuai template.");
+      const headers = raw[headerIdx].map(h=>String(h||"").replace(/\n/g," ").trim().toLowerCase());
+      const col = (patterns)=>{
+        for(const p of patterns){ const i = headers.findIndex(h=>h.includes(p)); if(i!==-1) return i; }
+        return -1;
+      };
+      const cMap = {
+        inv: col(["no. faktur","no faktur"]),
+        invDate: col(["tgl faktur","tanggal faktur"]),
+        dueDate: col(["tgl jatuh tempo","jatuh tempo"]),
+        custCode: col(["no. cust","no cust"]),
+        custName: col(["nama customer"]),
+        invAmount: col(["nilai faktur"]),
+        outstanding: col(["sisa piutang"]),
+        salesman: col(["salesman"]),
+        area: col(["area"]),
+        bbCode: col(["id cust bb"]),
+        bbName: col(["nama cust bb"]),
+      };
+      if(cMap.inv===-1 || cMap.invDate===-1) throw new Error("Kolom wajib (No Faktur / Tgl Faktur) tidak ditemukan.");
+
+      if(!outletMap){
+        const { data: outlets } = await sb.from("outlets").select("id,outlet_code");
+        outletMap = new Map((outlets||[]).map(o=>[String(o.outlet_code).trim().toUpperCase(), o.id]));
+      }
+
+      const dataRows = raw.slice(headerIdx+1);
+      parsedRows = [];
+      const errors = [];
+      const seenInv = new Set();
+      let dupCount = 0;
+      for(let i=0;i<dataRows.length;i++){
+        const row = dataRows[i];
+        if(!row || row.every(c=>c===null||c==="")) continue;
+        const invNo = row[cMap.inv];
+        if(invNo===null || invNo==="") continue;
+        const invDateRaw = row[cMap.invDate];
+        const invDate = excelSerialToDate(invDateRaw);
+        const outstanding = Number(row[cMap.outstanding]) || 0;
+        const invAmount = Number(row[cMap.invAmount]) || 0;
+        const bbCode = cMap.bbCode!==-1 ? String(row[cMap.bbCode]||"").trim() : "";
+        const custCode = cMap.custCode!==-1 ? String(row[cMap.custCode]||"").trim() : "";
+        const lookupCode = (bbCode||custCode).toUpperCase();
+        const outletId = outletMap.get(lookupCode) || null;
+
+        const rec = {
+          invoice_number: String(invNo).trim(),
+          invoice_date: toISO(invDate),
+          due_date: toISO(excelSerialToDate(row[cMap.dueDate])),
+          customer_code: custCode || null,
+          customer_name: cMap.custName!==-1 ? String(row[cMap.custName]||"").trim() : null,
+          invoice_amount: invAmount,
+          outstanding_amount: outstanding,
+          salesman: cMap.salesman!==-1 ? String(row[cMap.salesman]||"").trim() : null,
+          area: cMap.area!==-1 ? String(row[cMap.area]||"").trim() : null,
+          outlet_code_bb: bbCode || custCode || null,
+          outlet_id: outletId,
+        };
+        if(!rec.invoice_date){ errors.push(`Baris ${i+headerIdx+2}: tanggal invoice tidak valid`); continue; }
+        if(seenInv.has(rec.invoice_number)){ dupCount++; }
+        seenInv.add(rec.invoice_number);
+        if(outstanding !== 0) parsedRows.push(rec);
+      }
+
+      const unmapped = parsedRows.filter(r=>!r.outlet_id).length;
+      renderPreview(sheetName, parsedRows, errors, dupCount, unmapped);
+    }catch(err){
+      qs("#ar-preview").innerHTML = `<div class="error-box mt">${esc(err.message)}</div>`;
+    }
+  });
+
+  function renderPreview(sheetName, records, errors, dupCount, unmapped){
+    qs("#ar-preview").innerHTML = `
+    <div class="section-head"><h2>Preview Import</h2></div>
+    <div class="card">
+      <div class="kv-row"><div class="k">Sheet dibaca</div><div class="v">${esc(sheetName)}</div></div>
+      <div class="kv-row"><div class="k">Baris valid (outstanding ≠ 0)</div><div class="v">${records.length}</div></div>
+      <div class="kv-row"><div class="k">Invoice duplikat dalam file</div><div class="v">${dupCount}</div></div>
+      <div class="kv-row" style="border-bottom:none;"><div class="k">Belum termapping ke Master Outlet</div><div class="v">${unmapped}</div></div>
+      ${errors.length ? `<div class="error-box mt">${errors.length} baris dilewati karena error. Contoh: ${esc(errors[0])}</div>` : ""}
+      ${unmapped>0 ? `<div class="small muted mt">Baris yang belum termapping tetap akan diimport, namun tidak muncul di Monitoring Outlet sampai kode outlet ditambahkan di Master Outlet.</div>` : ""}
+      <button class="btn btn-primary mt" id="ar-confirm" ${records.length===0?"disabled":""}>Import ${records.length} Baris</button>
+    </div>`;
+    qs("#ar-confirm")?.addEventListener("click", async ()=>{ await runImport(records); });
+  }
+
+  async function runImport(records){
+    const btn = qs("#ar-confirm");
+    btn.disabled = true; btn.textContent = "Mengimport…";
+    const dataDate = qs("#ar-datadate").value;
+    const fileName = qs("#ar-file").files[0]?.name || "import.xlsx";
+    try{
+      const { data: imp, error: e1 } = await sb.from("ar_imports").insert({
+        file_name: fileName, data_date: dataDate, total_rows: records.length,
+        imported_by: APP.user.id, status: "processing"
+      }).select().single();
+      if(e1) throw e1;
+
+      const chunkSize = 400;
+      for(let i=0;i<records.length;i+=chunkSize){
+        const chunk = records.slice(i,i+chunkSize).map(r=>({...r, import_id: imp.id}));
+        const { error: e2 } = await sb.from("ar_data").insert(chunk);
+        if(e2) throw e2;
+        btn.textContent = `Mengimport… ${Math.min(i+chunkSize,records.length)}/${records.length}`;
+      }
+      await sb.from("ar_imports").update({status:"completed"}).eq("id", imp.id);
+      toast("Import berhasil! Dashboard telah diperbarui.", "ok");
+      APP.outletCache = null;
+      location.hash = "#/dashboard";
+    }catch(err){
+      toast("Import gagal: "+err.message, "err");
+      btn.disabled = false; btn.textContent = "Coba Lagi";
+    }
+  }
+}
+
+/* =========================================================
+   VIEW: MASTER OUTLET (admin)
+   ========================================================= */
+async function viewMaster(container){
+  const rows = await fetchOutletSummary();
+  const state = {q:"", depo:"", region:"", dsr:"", sektor:"", page:1, pageSize:20};
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="flex-between">
+        <div style="font-weight:700;">Import Master Outlet</div>
+      </div>
+      <div class="small muted mt">Upload file Excel Sheet "BB 2026" untuk menambah/memperbarui outlet (kolom: Depo, Region, DSR, Kode Outlet, Nama Outlet, Sektor, Credit Limit).</div>
+      <label class="upload-drop mt" id="mst-drop">
+        ${ICONS.upload.replace('width="24" height="24"','width="24" height="24"')}
+        <div style="font-weight:700; margin-top:8px;">Klik untuk pilih file .xlsx</div>
+        <input type="file" id="mst-file" accept=".xlsx,.xls" style="display:none;">
+      </label>
+      <div id="mst-preview"></div>
+    </div>
+
+    <div class="search-wrap mt">
+      ${ICONS.search}
+      <input class="input" id="mst-search" placeholder="Cari kode / nama outlet…">
+    </div>
+    <div class="flex-between mt"><div class="small muted" id="mst-count"></div></div>
+    <div id="mst-list" class="mt"></div>
+    <div id="mst-more"></div>
+  `;
+
+  function applyAndRender(){
+    let f = rows.filter(r=>{
+      if(state.q){ const q=state.q.toLowerCase(); if(!(String(r.outlet_name||"").toLowerCase().includes(q)||String(r.outlet_code||"").toLowerCase().includes(q))) return false; }
+      return true;
+    });
+    qs("#mst-count").textContent = `${f.length} outlet terdaftar`;
+    const shown = f.slice(0, state.page*state.pageSize);
+    qs("#mst-list").innerHTML = shown.map(r=>`
+      <div class="card" style="padding:13px 15px;">
+        <div class="flex-between">
+          <div>
+            <div style="font-weight:700; font-size:13.5px;">${esc(r.outlet_name)}</div>
+            <div class="small muted">${esc(r.outlet_code)} · ${esc(r.depo||"-")} · ${esc(r.region||"-")}</div>
+          </div>
+          <div class="small" style="text-align:right;"><div class="muted">Credit Limit</div><div style="font-weight:700;" class="num">${rpShort(r.credit_limit)}</div></div>
+        </div>
+      </div>`).join("") || emptyStateHTML("Belum ada outlet","Import Master Outlet terlebih dahulu.");
+    qs("#mst-more").innerHTML = f.length>shown.length ? `<button class="btn btn-outline" id="mst-more-btn">Muat lebih banyak</button>` : "";
+    qs("#mst-more-btn")?.addEventListener("click",()=>{ state.page++; applyAndRender(); });
+  }
+  qs("#mst-search").addEventListener("input", debounce(e=>{ state.q=e.target.value; state.page=1; applyAndRender(); },180));
+
+  qs("#mst-drop").addEventListener("click",(e)=>{ if(e.target.tagName!=="INPUT") qs("#mst-file").click(); });
+  qs("#mst-file").addEventListener("change", async (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    qs("#mst-preview").innerHTML = `<div class="loading-wrap"><div class="spinner"></div> Membaca file…</div>`;
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:"array"});
+      const sheetName = wb.SheetNames.find(n=>/bb/i.test(n)) || wb.SheetNames[0];
+      const raw = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:null});
+      const headerIdx = raw.findIndex(row => row && row.some(c=>String(c||"").toLowerCase().includes("kode outlet")));
+      if(headerIdx===-1) throw new Error("Header 'Kode Outlet' tidak ditemukan.");
+      const headers = raw[headerIdx].map(h=>String(h||"").toLowerCase().trim());
+      const col=(pats)=>{ for(const p of pats){ const i=headers.findIndex(h=>h.includes(p)); if(i!==-1) return i; } return -1; };
+      const cMap = { depo:col(["depo"]), region:col(["region"]), dsr:col(["dsr"]), code:col(["kode outlet"]), name:col(["nama outlet"]), sektor:col(["sektor"]), credit:col(["credit limit"]) };
+      const records = [];
+      for(const row of raw.slice(headerIdx+1)){
+        if(!row) continue;
+        const code = row[cMap.code];
+        if(!code || String(code).trim()==="" || String(code).trim()==="0") continue;
+        records.push({
+          outlet_code: String(code).trim(),
+          outlet_name: String(row[cMap.name]||"-").trim(),
+          depo: cMap.depo!==-1 ? String(row[cMap.depo]||"").trim() : null,
+          region: cMap.region!==-1 ? String(row[cMap.region]||"").trim() : null,
+          dsr: cMap.dsr!==-1 ? String(row[cMap.dsr]||"").trim() : null,
+          sektor: cMap.sektor!==-1 ? String(row[cMap.sektor]||"").trim() : null,
+          credit_limit: Number(row[cMap.credit])||0,
+          updated_at: new Date().toISOString(),
+        });
+      }
+      qs("#mst-preview").innerHTML = `<div class="card mt">
+        <div class="kv-row" style="border-bottom:none;"><div class="k">Outlet siap diimport (insert/update)</div><div class="v">${records.length}</div></div>
+        <button class="btn btn-primary mt" id="mst-confirm">Simpan ${records.length} Outlet</button>
+      </div>`;
+      qs("#mst-confirm").addEventListener("click", async ()=>{
+        qs("#mst-confirm").disabled = true; qs("#mst-confirm").textContent = "Menyimpan…";
+        try{
+          const chunkSize = 400;
+          for(let i=0;i<records.length;i+=chunkSize){
+            const { error } = await sb.from("outlets").upsert(records.slice(i,i+chunkSize), {onConflict:"outlet_code"});
+            if(error) throw error;
+          }
+          toast("Master outlet berhasil diperbarui.", "ok");
+          APP.outletCache = null;
+          location.hash = "#/master"; router();
+        }catch(err){ toast("Gagal menyimpan: "+err.message, "err"); }
+      });
+    }catch(err){
+      qs("#mst-preview").innerHTML = `<div class="error-box mt">${esc(err.message)}</div>`;
+    }
+  });
+
+  applyAndRender();
+}
+
+/* =========================================================
+   VIEW: PROFILE
+   ========================================================= */
+async function viewProfile(container){
+  const p = APP.profile;
+  container.innerHTML = `
+  <div class="card" style="text-align:center; padding:26px 16px;">
+    <div style="width:56px;height:56px;border-radius:16px;background:var(--primary-tint); color:var(--primary); display:flex; align-items:center; justify-content:center; margin:0 auto 12px; font-weight:800; font-size:20px;">
+      ${esc((p?.name||"?").charAt(0).toUpperCase())}
+    </div>
+    <div style="font-weight:800; font-size:16px;">${esc(p?.name||"-")}</div>
+    <div class="small muted">${esc(p?.email||"-")}</div>
+    <div class="mt">${p?.role==="admin" ? `<span class="badge badge-green">Admin</span>` : `<span class="badge badge-grey">User</span>`}</div>
+  </div>
+
+  <div class="section-head"><h2>Tentang Aplikasi</h2></div>
+  <div class="card">
+    <div class="kv-row"><div class="k">Aplikasi</div><div class="v">POPSA AR Monitoring</div></div>
+    <div class="kv-row" style="border-bottom:none;"><div class="k">Data terakhir diupdate</div><div class="v">${APP.latestImport?fmtDate(APP.latestImport.data_date):"-"}</div></div>
+  </div>
+
+  <button class="btn btn-outline mt" id="logout-btn">${ICONS.logout.replace('width="24" height="24"','width="16" height="16"')} Keluar</button>
+  `;
+  qs("#logout-btn").addEventListener("click", async ()=>{
+    await sb.auth.signOut();
+    APP.outletCache = null;
+    location.hash = "#/login";
+  });
+}
+
+/* ---------------- bottom sheet helper ---------------- */
+function openSheet(html){
+  closeSheet();
+  const bg = document.createElement("div");
+  bg.className = "sheet-backdrop";
+  bg.id = "active-sheet";
+  bg.innerHTML = `<div class="sheet"><div class="handle"></div>${html}</div>`;
+  bg.addEventListener("click",(e)=>{ if(e.target===bg) closeSheet(); });
+  document.body.appendChild(bg);
+}
+function closeSheet(){ qs("#active-sheet")?.remove(); }
+</script>
+</body>
+</html>
