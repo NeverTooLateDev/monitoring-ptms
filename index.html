@@ -463,12 +463,12 @@ function renderShellChrome(path){
   const topbar = document.createElement("div");
   topbar.id = "topbar-mount";
   topbar.innerHTML = topbarHTML(path);
-  shell.insertBefore(topbar.firstElementChild, shell.firstChild);
+  shell.insertBefore(topbar, shell.firstChild);
 
   const nav = document.createElement("div");
   nav.id = "bottomnav-mount";
   nav.innerHTML = bottomNavHTML(path);
-  shell.appendChild(nav.firstElementChild);
+  shell.appendChild(nav);
 }
 
 function topbarHTML(path){
